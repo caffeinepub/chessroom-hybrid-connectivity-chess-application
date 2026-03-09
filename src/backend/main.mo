@@ -51,6 +51,10 @@ actor {
     jetonPot : Nat;
     difficulty : Text;
     status : Text;
+    moves : [Text];
+    lastHeartbeat1 : Int;
+    lastHeartbeat2 : Int;
+    disconnectWinner : ?Principal;
     createdAt : Int;
   };
 
@@ -311,6 +315,10 @@ actor {
       jetonPot = jetonWager;
       difficulty = difficulty;
       status = "waiting";
+      moves = [];
+      lastHeartbeat1 = 0;
+      lastHeartbeat2 = 0;
+      disconnectWinner = null;
       createdAt = Time.now();
     };
 
@@ -335,6 +343,10 @@ actor {
           jetonPot = game.jetonPot + jetonWager;
           difficulty = game.difficulty;
           status = "active";
+          moves = game.moves;
+          lastHeartbeat1 = game.lastHeartbeat1;
+          lastHeartbeat2 = game.lastHeartbeat2;
+          disconnectWinner = game.disconnectWinner;
           createdAt = game.createdAt;
         };
 
@@ -461,5 +473,187 @@ actor {
 
   public query func getAllUsers() : async [UserProfile] {
     Array.fromIter(userProfiles.values());
+  };
+
+  // Account Deletion
+  public shared ({ caller }) func deleteAccount() : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can delete their own account");
+    };
+
+    // Remove user profile
+    userProfiles.remove(caller);
+
+    // Remove related code mapping
+    var codesToRemove : [Text] = [];
+    for ((code, principal) in userCodeMap.entries()) {
+      if (principal == caller) {
+        codesToRemove := codesToRemove.concat([code]);
+      };
+    };
+    for (code in codesToRemove.values()) {
+      userCodeMap.remove(code);
+    };
+
+    // Remove leaderboard entry
+    leaderboard.remove(caller);
+
+    // Remove transaction history
+    transactions.remove(caller);
+  };
+
+  // Online Game Move Sync
+  public shared ({ caller }) func submitMove(sessionId : Text, moveNotation : Text) : async () {
+    switch (gameStates.get(sessionId)) {
+      case (?game) {
+        // Verify caller is a player in this game
+        let isPlayer1 = caller == game.player1;
+        let isPlayer2 = switch (game.player2) {
+          case (?p2) { caller == p2 };
+          case null { false };
+        };
+        
+        if (not (isPlayer1 or isPlayer2)) {
+          Runtime.trap("Unauthorized: Only players in this game can submit moves");
+        };
+
+        // Only allow moves if the game is active
+        if (game.status == "active" or game.status == "waiting") {
+          let updatedGame = {
+            sessionId = game.sessionId;
+            player1 = game.player1;
+            player2 = game.player2;
+            jetonPot = game.jetonPot;
+            difficulty = game.difficulty;
+            status = game.status;
+            moves = game.moves.concat([moveNotation]);
+            lastHeartbeat1 = game.lastHeartbeat1;
+            lastHeartbeat2 = game.lastHeartbeat2;
+            disconnectWinner = game.disconnectWinner;
+            createdAt = game.createdAt;
+          };
+          gameStates.add(sessionId, updatedGame);
+        } else {
+          Runtime.trap("Game is not active");
+        };
+      };
+      case null {
+        Runtime.trap("Game session not found");
+      };
+    };
+  };
+
+  public query ({ caller }) func getGameMoves(sessionId : Text) : async [Text] {
+    switch (gameStates.get(sessionId)) {
+      case (?game) {
+        // Verify caller is a player in this game or an admin
+        let isPlayer1 = caller == game.player1;
+        let isPlayer2 = switch (game.player2) {
+          case (?p2) { caller == p2 };
+          case null { false };
+        };
+        let isAdmin = AccessControl.isAdmin(accessControlState, caller);
+        
+        if (not (isPlayer1 or isPlayer2 or isAdmin)) {
+          Runtime.trap("Unauthorized: Only players in this game or admins can view moves");
+        };
+        
+        game.moves;
+      };
+      case null { Runtime.trap("Game session not found") };
+    };
+  };
+
+  // Disconnect Management
+  public shared ({ caller }) func updatePlayerHeartbeat(sessionId : Text) : async () {
+    switch (gameStates.get(sessionId)) {
+      case (?game) {
+        // Verify caller is a player in this game
+        let isPlayer1 = caller == game.player1;
+        let isPlayer2 = switch (game.player2) {
+          case (?p2) { caller == p2 };
+          case null { false };
+        };
+        
+        if (not (isPlayer1 or isPlayer2)) {
+          Runtime.trap("Unauthorized: Only players in this game can update heartbeat");
+        };
+
+        let updatedGame = {
+          sessionId = game.sessionId;
+          player1 = game.player1;
+          player2 = game.player2;
+          jetonPot = game.jetonPot;
+          difficulty = game.difficulty;
+          status = game.status;
+          moves = game.moves;
+          lastHeartbeat1 = if (caller == game.player1) { Time.now() } else { game.lastHeartbeat1 };
+          lastHeartbeat2 = if (switch (game.player2) { case (?p) { p == caller }; case (null) { false } }) { Time.now() } else {
+            game.lastHeartbeat2;
+          };
+          disconnectWinner = game.disconnectWinner;
+          createdAt = game.createdAt;
+        };
+        gameStates.add(sessionId, updatedGame);
+      };
+      case null {
+        Runtime.trap("Game session not found");
+      };
+    };
+  };
+
+  public shared ({ caller }) func checkDisconnect(sessionId : Text) : async ?Principal {
+    switch (gameStates.get(sessionId)) {
+      case (?game) {
+        // Verify caller is a player in this game or an admin
+        let isPlayer1 = caller == game.player1;
+        let isPlayer2 = switch (game.player2) {
+          case (?p2) { caller == p2 };
+          case null { false };
+        };
+        let isAdmin = AccessControl.isAdmin(accessControlState, caller);
+        
+        if (not (isPlayer1 or isPlayer2 or isAdmin)) {
+          Runtime.trap("Unauthorized: Only players in this game or admins can check disconnect");
+        };
+
+        let now = Time.now();
+        let disconnectThreshold = 30 * 1_000_000_000; // 30 seconds in nanoseconds
+
+        if (game.status == "active") {
+          let disconnectWinner = if (now > game.lastHeartbeat1 + disconnectThreshold) {
+            game.player2;
+          } else if (now > game.lastHeartbeat2 + disconnectThreshold) {
+            ?game.player1;
+          } else {
+            null;
+          };
+
+          gameStates.add(
+            sessionId,
+            {
+              sessionId = game.sessionId;
+              player1 = game.player1;
+              player2 = game.player2;
+              jetonPot = game.jetonPot;
+              difficulty = game.difficulty;
+              status = game.status;
+              moves = game.moves;
+              lastHeartbeat1 = game.lastHeartbeat1;
+              lastHeartbeat2 = game.lastHeartbeat2;
+              disconnectWinner = disconnectWinner;
+              createdAt = game.createdAt;
+            },
+          );
+
+          disconnectWinner;
+        } else {
+          game.disconnectWinner;
+        };
+      };
+      case null {
+        Runtime.trap("Game session not found");
+      };
+    };
   };
 };

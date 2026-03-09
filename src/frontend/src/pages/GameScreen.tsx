@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useActor } from "@/hooks/useActor";
 import { useInterstitialAd } from "@/hooks/useInterstitialAd";
 import { offlineStorage } from "@/lib/offlineStorage";
 import { type Language, getTranslations } from "@/lib/translations";
@@ -19,9 +20,11 @@ import {
   Users,
   Zap,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import type { AIDifficulty, GameMode, UserSession } from "../App";
 import ChessBoard from "../components/ChessBoard";
+import GameResultPopup from "../components/GameResultPopup";
 
 interface GameScreenProps {
   session: UserSession;
@@ -64,6 +67,105 @@ export default function GameScreen({
   const [randomAction, setRandomAction] = useState<"create" | "join" | null>(
     null,
   );
+  // Online sync and disconnect
+  const { actor } = useActor();
+  const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "error">(
+    "idle",
+  );
+  const [disconnectCountdown, setDisconnectCountdown] = useState<number | null>(
+    null,
+  );
+  const [showResultPopup, setShowResultPopup] = useState(false);
+  const [resultData, setResultData] = useState<{
+    result: "win" | "lose" | "draw";
+    reason: string;
+    xpGained: number;
+    jetonsGained: number;
+  } | null>(null);
+  const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
+  const disconnectIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
+
+  const isOnlineMode = gameMode === "random" || gameMode === "friend";
+
+  // Online sync effect
+  useEffect(() => {
+    if (!isOnlineMode || !gameStarted || !actor || !roomCode) return;
+
+    // Sync moves every 3 seconds
+    syncIntervalRef.current = setInterval(async () => {
+      setSyncStatus("syncing");
+      try {
+        await actor.getGameMoves(roomCode);
+        setSyncStatus("idle");
+      } catch {
+        setSyncStatus("idle");
+      }
+    }, 3000);
+
+    // Heartbeat every 10 seconds
+    heartbeatIntervalRef.current = setInterval(async () => {
+      try {
+        await actor.updatePlayerHeartbeat(roomCode);
+      } catch {
+        // ignore
+      }
+    }, 10000);
+
+    // Check disconnect every 5 seconds
+    disconnectIntervalRef.current = setInterval(async () => {
+      try {
+        const result = await actor.checkDisconnect(roomCode);
+        if (result !== null) {
+          // Opponent disconnected - user wins
+          clearAllOnlineIntervals();
+          toast.success(t.opponentDisconnected); // eslint-disable-line
+        }
+      } catch {
+        // ignore
+      }
+    }, 5000);
+
+    return () => clearAllOnlineIntervals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnlineMode, gameStarted, actor, roomCode, t.opponentDisconnected]);
+
+  const clearAllOnlineIntervals = () => {
+    if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
+    if (heartbeatIntervalRef.current)
+      clearInterval(heartbeatIntervalRef.current);
+    if (disconnectIntervalRef.current)
+      clearInterval(disconnectIntervalRef.current);
+    if (countdownIntervalRef.current)
+      clearInterval(countdownIntervalRef.current);
+    syncIntervalRef.current = null;
+    heartbeatIntervalRef.current = null;
+    disconnectIntervalRef.current = null;
+    countdownIntervalRef.current = null;
+  };
+
+  // 30s disconnect countdown (for user's own disconnect scenario)
+  const _startDisconnectCountdown = () => {
+    setDisconnectCountdown(30);
+    countdownIntervalRef.current = setInterval(() => {
+      setDisconnectCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(countdownIntervalRef.current!);
+          countdownIntervalRef.current = null;
+          toast.error(t.connectionLost);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
 
   // Interstitial ad hook
   const { showAd: showInterstitialAd, isAdLoaded: isInterstitialLoaded } =
@@ -195,10 +297,26 @@ export default function GameScreen({
           jetons: newJetons,
           title: newTitle,
         });
+        // Keep jeton cache in sync for shop purchases
+        offlineStorage.cacheUserJetons(session.code, newJetons);
       }
     } catch {
       // ignore
     }
+    // Show result popup
+    const popupResult = result === "loss" ? "lose" : result;
+    const reasonMap = {
+      win: "Harika oyun!",
+      lose: "Bir dahaki sefere daha iyi olacaksın!",
+      draw: "Dengeli bir mücadele!",
+    };
+    setResultData({
+      result: popupResult as "win" | "lose" | "draw",
+      reason: reasonMap[popupResult as keyof typeof reasonMap] ?? "",
+      xpGained,
+      jetonsGained,
+    });
+    setShowResultPopup(true);
   };
 
   const getModeTitle = () => {
@@ -737,6 +855,28 @@ export default function GameScreen({
             </Card>
           )}
 
+          {gameStarted && isOnlineMode && (
+            <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-card/50 border border-border/50 text-xs font-medium mb-2">
+              <span
+                data-ocid="game.sync_state"
+                className={`flex items-center gap-1.5 ${syncStatus === "syncing" ? "text-amber-400" : "text-green-400"}`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${syncStatus === "syncing" ? "bg-amber-400 animate-pulse" : "bg-green-400"}`}
+                />
+                {syncStatus === "syncing" ? t.syncingMoves : "Online"}
+              </span>
+              {disconnectCountdown !== null && (
+                <span
+                  data-ocid="game.disconnect_timer"
+                  className="text-red-400 font-mono animate-pulse"
+                >
+                  {disconnectCountdown}s
+                </span>
+              )}
+            </div>
+          )}
+
           {gameStarted && (
             <ChessBoard
               gameMode={gameMode}
@@ -750,6 +890,20 @@ export default function GameScreen({
           )}
         </div>
       </main>
+
+      {resultData && (
+        <GameResultPopup
+          isOpen={showResultPopup}
+          result={resultData.result}
+          reason={resultData.reason}
+          xpGained={resultData.xpGained}
+          jetonsGained={resultData.jetonsGained}
+          onClose={() => {
+            setShowResultPopup(false);
+            setGameStarted(false);
+          }}
+        />
+      )}
     </div>
   );
 }

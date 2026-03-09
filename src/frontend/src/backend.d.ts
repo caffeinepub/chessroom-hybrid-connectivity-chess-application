@@ -16,10 +16,14 @@ export interface LeaderboardEntry {
 }
 export interface GameState {
     status: string;
+    moves: Array<string>;
+    lastHeartbeat1: bigint;
+    lastHeartbeat2: bigint;
     difficulty: string;
     createdAt: bigint;
     player1: Principal;
     player2?: Principal;
+    disconnectWinner?: Principal;
     jetonPot: bigint;
     sessionId: string;
 }
@@ -38,11 +42,14 @@ export enum UserRole {
 }
 export interface backendInterface {
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    checkDisconnect(sessionId: string): Promise<Principal | null>;
     createGameSession(sessionId: string, jetonWager: bigint, difficulty: string): Promise<void>;
+    deleteAccount(): Promise<void>;
     getActiveGameSessions(): Promise<Array<GameState>>;
     getAllUsers(): Promise<Array<UserProfile>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
+    getGameMoves(sessionId: string): Promise<Array<string>>;
     getGameSession(sessionId: string): Promise<GameState | null>;
     getLeaderboard(): Promise<Array<LeaderboardEntry>>;
     getSystemStatistics(): Promise<{
@@ -58,7 +65,9 @@ export interface backendInterface {
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     sendJetonsToAllUsers(amount: bigint, message: string): Promise<void>;
     sendJetonsToUser(username: string, amount: bigint, message: string): Promise<void>;
+    submitMove(sessionId: string, moveNotation: string): Promise<void>;
     updateJetonBalance(amount: bigint): Promise<void>;
+    updatePlayerHeartbeat(sessionId: string): Promise<void>;
     updateXP(xpChange: bigint): Promise<string>;
     validateLoginCode(code: string): Promise<Principal | null>;
 }

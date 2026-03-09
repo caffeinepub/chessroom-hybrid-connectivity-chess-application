@@ -1,11 +1,20 @@
 import AdNative from "@/components/AdNative";
 import ConnectionStatus from "@/components/ConnectionStatus";
 import FriendPanel from "@/components/FriendPanel";
+import JetonShop from "@/components/JetonShop";
 import LanguageSelector from "@/components/LanguageSelector";
 import MatchHistory from "@/components/MatchHistory";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,7 +43,9 @@ import {
   Crown,
   History,
   LogOut,
+  ShoppingBag,
   Sparkles,
+  Trash2,
   Trophy,
   User,
   UserPlus,
@@ -96,12 +107,15 @@ export default function MainScreen({
 }: MainScreenProps) {
   const t = getTranslations(language);
   const { isOnline } = useNetworkStatus();
-  useActor(); // keep actor context alive
+  const { actor } = useActor();
   const queryClient = useQueryClient();
 
   const [friendPanelOpen, setFriendPanelOpen] = useState(false);
   const [matchHistoryOpen, setMatchHistoryOpen] = useState(false);
+  const [shopOpen, setShopOpen] = useState(false);
   const [nextDailyClaim, setNextDailyClaim] = useState<Date | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [nextLeaderboardReset, setNextLeaderboardReset] = useState<Date | null>(
     null,
   );
@@ -112,7 +126,9 @@ export default function MainScreen({
   const { data: userData, refetch: refetchUser } = useQuery({
     queryKey: ["user", session.code],
     queryFn: async () => {
-      return await offlineStorage.getUserByCode(session.code);
+      const u = await offlineStorage.getUserByCode(session.code);
+      if (u) offlineStorage.cacheUserJetons(session.code, u.jetons);
+      return u;
     },
   });
 
@@ -199,6 +215,21 @@ export default function MainScreen({
       Büyükusta: t.titleGrandmaster,
     };
     return titleMap[title] || title;
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!actor) return;
+    setIsDeleting(true);
+    try {
+      await actor.deleteAccount();
+      setShowDeleteDialog(false);
+      toast.success(t.accountDeleted);
+      onLogout();
+    } catch {
+      // silently ignore
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -352,6 +383,15 @@ export default function MainScreen({
                   >
                     <History className="w-4 h-4 mr-2 text-purple-400" />
                     {t.matchHistory}
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem
+                    onClick={() => setShowDeleteDialog(true)}
+                    data-ocid="profile.delete_button"
+                    className="cursor-pointer m-2 p-3 border-2 border-orange-500/50 hover:bg-orange-500/20 hover:border-orange-500 text-foreground hover:text-orange-600 dark:hover:text-orange-400 transition-all duration-300 font-bold rounded-md"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2 text-orange-400" />
+                    {t.deleteAccount}
                   </DropdownMenuItem>
 
                   <DropdownMenuItem
@@ -728,6 +768,14 @@ export default function MainScreen({
       </main>
 
       {/* Dialogs */}
+      <JetonShop
+        isOpen={shopOpen}
+        onClose={() => setShopOpen(false)}
+        userCode={session.code}
+        currentJetons={userStats.jetons}
+        onPurchase={() => refetchUser()}
+      />
+
       <FriendPanel
         open={friendPanelOpen}
         onClose={() => setFriendPanelOpen(false)}
@@ -741,6 +789,45 @@ export default function MainScreen({
         userCode={session.code}
         language={language}
       />
+
+      {/* Delete Account Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent data-ocid="delete_account.dialog" className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <Trash2 className="w-5 h-5" />
+              {t.deleteAccount}
+            </DialogTitle>
+            <DialogDescription className="space-y-2 pt-2">
+              <span className="block font-medium text-foreground">
+                {t.deleteAccountConfirm}
+              </span>
+              <span className="block text-sm text-muted-foreground">
+                {t.deleteAccountWarning}
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 flex-col sm:flex-row">
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteDialog(false)}
+              data-ocid="delete_account.cancel_button"
+              className="flex-1"
+            >
+              "İptal"
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteAccount}
+              disabled={isDeleting}
+              data-ocid="delete_account.confirm_button"
+              className="flex-1"
+            >
+              {isDeleting ? "..." : t.deleteAccount}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

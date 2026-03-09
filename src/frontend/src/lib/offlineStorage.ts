@@ -207,7 +207,7 @@ class OfflineStorage {
 
     const existingUser = await this.getUserByUsername(username);
     if (existingUser) {
-      throw new Error("Kullanıcı adı zaten mevcut");
+      throw new Error("Kullan\u0131c\u0131 ad\u0131 zaten mevcut");
     }
 
     let code = this.generateCode();
@@ -220,7 +220,7 @@ class OfflineStorage {
       code,
       jetons: 1000,
       xp: 0,
-      title: "Başlangıç",
+      title: "Ba\u015flang\u0131\u00e7",
       isAdmin: code === "KING +154",
       weeklyXP: 0,
     };
@@ -249,7 +249,7 @@ class OfflineStorage {
     const user = await this.getUserByCode(code);
     if (!user) {
       throw new Error(
-        "Geçersiz kod. Lütfen kodunuzu kontrol edip tekrar deneyin.",
+        "Ge\u00e7ersiz kod. L\u00fctfen kodunuzu kontrol edip tekrar deneyin.",
       );
     }
 
@@ -623,6 +623,67 @@ class OfflineStorage {
         : 0;
 
     return { totalUsers, totalJetons, averageXP: Math.round(averageXP) };
+  }
+
+  // ─── INVENTORY SYSTEM ────────────────────────────────────────────────────
+  // Stored in localStorage synchronously for instant purchase feedback
+
+  private getInventoryKey(userCode: string): string {
+    return `chessroom_inv_${userCode}`;
+  }
+
+  private getJetonCacheKey(userCode: string): string {
+    return `chessroom_jcache_${userCode}`;
+  }
+
+  getInventory(userCode: string): string[] {
+    try {
+      const raw = localStorage.getItem(this.getInventoryKey(userCode));
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  hasItem(userCode: string, itemId: string): boolean {
+    return this.getInventory(userCode).includes(itemId);
+  }
+
+  /**
+   * Synchronously deducts jetons and stores item in inventory.
+   * Uses a localStorage jeton cache that should be kept fresh via cacheUserJetons().
+   * Returns false if insufficient balance or already owned.
+   */
+  purchaseItem(userCode: string, itemId: string, price: number): boolean {
+    if (this.hasItem(userCode, itemId)) return false;
+
+    // Read cached jeton balance
+    const cachedRaw = localStorage.getItem(this.getJetonCacheKey(userCode));
+    const cachedJetons = cachedRaw ? Number.parseInt(cachedRaw, 10) : null;
+    if (cachedJetons === null || cachedJetons < price) return false;
+
+    // Deduct from cache
+    localStorage.setItem(
+      this.getJetonCacheKey(userCode),
+      String(cachedJetons - price),
+    );
+
+    // Also persist to IndexedDB asynchronously
+    this.updateUser(userCode, { jetons: cachedJetons - price }).catch(() => {});
+
+    // Add item to inventory
+    const inv = this.getInventory(userCode);
+    inv.push(itemId);
+    localStorage.setItem(this.getInventoryKey(userCode), JSON.stringify(inv));
+
+    return true;
+  }
+
+  /**
+   * Call after fetching fresh user data to keep the jeton cache in sync.
+   */
+  cacheUserJetons(userCode: string, jetons: number): void {
+    localStorage.setItem(this.getJetonCacheKey(userCode), String(jetons));
   }
 }
 

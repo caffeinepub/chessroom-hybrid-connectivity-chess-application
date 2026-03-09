@@ -400,6 +400,9 @@ export default function EntryScreen({
                     <p className="text-sm text-foreground text-center font-semibold">
                       {t.loginCodeHint}
                     </p>
+                    <p className="text-xs text-muted-foreground text-center mt-1">
+                      {t.codeLostMessage}
+                    </p>
                   </div>
                   <Button
                     type="submit"
