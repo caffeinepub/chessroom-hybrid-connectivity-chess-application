@@ -14,6 +14,7 @@ export interface User {
   weeklyXP?: number;
   weeklyLeaderboardResetDate?: string; // 'YYYY-WW'
   friends?: string[]; // list of followed usernames
+  bannedUntil?: number | null; // null = permanent, timestamp = expiry
 }
 
 export interface GameSession {
@@ -685,6 +686,34 @@ class OfflineStorage {
   cacheUserJetons(userCode: string, jetons: number): void {
     localStorage.setItem(this.getJetonCacheKey(userCode), String(jetons));
   }
+
+  // ─── BAN SYSTEM ──────────────────────────────────────────────────────────────
+
+  async banUser(username: string, durationDays: number | null): Promise<void> {
+    const user = await this.getUserByUsername(username);
+    if (!user) throw new Error("User not found");
+    const bannedUntil =
+      durationDays === null
+        ? null
+        : Date.now() + durationDays * 24 * 60 * 60 * 1000;
+    await this.updateUser(user.code, { bannedUntil });
+  }
+
+  async unbanUser(username: string): Promise<void> {
+    const user = await this.getUserByUsername(username);
+    if (!user) throw new Error("User not found");
+    await this.updateUser(user.code, { bannedUntil: undefined });
+  }
+
+  async isUserBanned(code: string): Promise<boolean> {
+    const user = await this.getUserByCode(code);
+    if (!user) return false;
+    if (user.bannedUntil === undefined) return false;
+    if (user.bannedUntil === null) return true; // permanent
+    return user.bannedUntil > Date.now(); // temp ban still active
+  }
 }
 
 export const offlineStorage = new OfflineStorage();
+
+// ─── BAN SYSTEM ──────────────────────────────────────────────────────────────

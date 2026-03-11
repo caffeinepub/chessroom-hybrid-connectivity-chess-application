@@ -36,12 +36,14 @@ import { offlineStorage } from "@/lib/offlineStorage";
 import { type Language, getTranslations } from "@/lib/translations";
 import { useQuery } from "@tanstack/react-query";
 import {
+  Ban,
   Coins,
   Crown,
   Gift,
   Loader2,
   LogOut,
   Megaphone,
+  Search,
   Send,
   TrendingUp,
   Users,
@@ -95,6 +97,14 @@ export default function AdminDashboard({
   // Global announcement state
   const [announcementModalOpen, setAnnouncementModalOpen] = useState(false);
   const [announcementMessage, setAnnouncementMessage] = useState("");
+
+  // Ban management state
+  const [banModalOpen, setBanModalOpen] = useState(false);
+  const [banSearchQuery, setBanSearchQuery] = useState("");
+  const [banSearchResults, setBanSearchResults] = useState<
+    import("@/lib/offlineStorage").User[]
+  >([]);
+  const [banLoading, setBanLoading] = useState(false);
 
   const handleBulkDistribution = async () => {
     const amount = Number.parseInt(bulkAmount);
@@ -167,6 +177,51 @@ export default function AdminDashboard({
     } catch (error: any) {
       toast.error(error.message || "İşlem başarısız oldu");
     }
+  };
+
+  const handleBanSearch = async () => {
+    if (!banSearchQuery.trim()) {
+      // Show all users if query empty
+      const all = await offlineStorage.getAllUsers();
+      setBanSearchResults(all.filter((u) => !u.isAdmin));
+      return;
+    }
+    setBanLoading(true);
+    try {
+      const results = await offlineStorage.searchUsers(banSearchQuery.trim());
+      setBanSearchResults(results.filter((u) => !u.isAdmin));
+    } finally {
+      setBanLoading(false);
+    }
+  };
+
+  const handleBanUser = async (username: string, permanent: boolean) => {
+    try {
+      await offlineStorage.banUser(username, permanent ? null : 7);
+      toast.success(
+        `${username} ${permanent ? t.permanentBan : t.tempBan7Days} - ${t.userBanned}`,
+      );
+      // Refresh results
+      await handleBanSearch();
+    } catch (error: any) {
+      toast.error(error.message || t.unknownError);
+    }
+  };
+
+  const handleUnbanUser = async (username: string) => {
+    try {
+      await offlineStorage.unbanUser(username);
+      toast.success(`${username} - ${t.userUnbanned}`);
+      await handleBanSearch();
+    } catch (error: any) {
+      toast.error(error.message || t.unknownError);
+    }
+  };
+
+  const isBanned = (user: import("@/lib/offlineStorage").User): boolean => {
+    if (user.bannedUntil === undefined) return false;
+    if (user.bannedUntil === null) return true;
+    return user.bannedUntil > Date.now();
   };
 
   return (
@@ -272,7 +327,7 @@ export default function AdminDashboard({
           </div>
 
           {/* Admin Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card
               className="border-4 border-green-500/50 shadow-2xl solid-overlay hover:shadow-green-500/50 hover:shadow-2xl transition-all duration-300 cursor-pointer group overflow-hidden relative hover:scale-105"
               onClick={() => setBulkModalOpen(true)}
@@ -329,6 +384,30 @@ export default function AdminDashboard({
               <CardContent className="relative">
                 <p className="text-center text-base font-bold text-foreground">
                   Tüm kullanıcılara mesaj gönder
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card
+              className="border-4 border-red-500/50 shadow-2xl solid-overlay hover:shadow-red-500/50 hover:shadow-2xl transition-all duration-300 cursor-pointer group overflow-hidden relative hover:scale-105"
+              onClick={() => {
+                setBanModalOpen(true);
+                handleBanSearch();
+              }}
+              data-ocid="admin.ban_management_card"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-red-500/20 to-orange-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <CardHeader className="relative">
+                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform duration-300">
+                  <Ban className="w-10 h-10 text-white" />
+                </div>
+                <CardTitle className="text-center text-2xl font-bold text-red-400">
+                  {t.userManagement}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="relative">
+                <p className="text-center text-base font-bold text-foreground">
+                  {t.banUser} / {t.unbanUser}
                 </p>
               </CardContent>
             </Card>
@@ -630,6 +709,124 @@ export default function AdminDashboard({
             >
               <Megaphone className="w-4 h-4 mr-2" />
               Gönder
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Ban Management Modal */}
+      <Dialog open={banModalOpen} onOpenChange={setBanModalOpen}>
+        <DialogContent
+          data-ocid="ban.dialog"
+          className="sm:max-w-lg border-4 border-red-500/50 solid-overlay"
+        >
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-red-400 flex items-center gap-2">
+              <Ban className="w-6 h-6" />
+              {t.userManagement}
+            </DialogTitle>
+            <DialogDescription className="text-base font-semibold">
+              {t.banUser} / {t.unbanUser}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder={t.searchPlayersPlaceholder}
+                value={banSearchQuery}
+                onChange={(e) => setBanSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleBanSearch()}
+                data-ocid="ban.search_input"
+                className="border-2 h-11 font-semibold"
+              />
+              <Button
+                onClick={handleBanSearch}
+                disabled={banLoading}
+                data-ocid="ban.search_button"
+                className="btn-gradient-primary text-white font-bold"
+              >
+                {banLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Search className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
+            <div className="max-h-80 overflow-y-auto space-y-2">
+              {banSearchResults.length === 0 && (
+                <p className="text-center text-muted-foreground py-4 font-semibold">
+                  {t.noResults}
+                </p>
+              )}
+              {banSearchResults.map((user, idx) => {
+                const banned = isBanned(user);
+                return (
+                  <div
+                    key={user.code}
+                    data-ocid={`ban.item.${idx + 1}`}
+                    className={`flex items-center justify-between p-3 rounded-lg border-2 ${banned ? "border-red-500/50 bg-red-500/10" : "border-border/50 bg-card/50"}`}
+                  >
+                    <div>
+                      <p className="font-bold text-foreground">
+                        {user.username}
+                      </p>
+                      <p className="text-xs text-muted-foreground font-mono">
+                        {user.code}
+                      </p>
+                      {banned && (
+                        <p className="text-xs text-red-400 font-bold mt-0.5">
+                          {user.bannedUntil === null
+                            ? t.permanentBan
+                            : `${t.tempBan7Days} - ${new Date(user.bannedUntil!).toLocaleDateString()}`}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      {banned ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleUnbanUser(user.username)}
+                          data-ocid={`ban.unban_button.${idx + 1}`}
+                          className="border-2 border-green-500/50 text-green-400 hover:bg-green-500/20 font-bold text-xs"
+                        >
+                          {t.unbanUser}
+                        </Button>
+                      ) : (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleBanUser(user.username, false)}
+                            data-ocid={`ban.temp_ban_button.${idx + 1}`}
+                            className="border-2 border-amber-500/50 text-amber-400 hover:bg-amber-500/20 font-bold text-xs"
+                          >
+                            7 Gün
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleBanUser(user.username, true)}
+                            data-ocid={`ban.perm_ban_button.${idx + 1}`}
+                            className="border-2 border-red-500/50 text-red-400 hover:bg-red-500/20 font-bold text-xs"
+                          >
+                            {t.permanentBan}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBanModalOpen(false)}
+              data-ocid="ban.close_button"
+              className="font-bold"
+            >
+              Kapat
             </Button>
           </DialogFooter>
         </DialogContent>

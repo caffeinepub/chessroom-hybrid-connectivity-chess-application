@@ -2,6 +2,14 @@ import LanguageSelector from "@/components/LanguageSelector";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useActor } from "@/hooks/useActor";
 import { useInterstitialAd } from "@/hooks/useInterstitialAd";
@@ -76,6 +84,9 @@ export default function GameScreen({
     null,
   );
   const [showResultPopup, setShowResultPopup] = useState(false);
+  const [showResignDialog, setShowResignDialog] = useState(false);
+  const [drawOfferPending, setDrawOfferPending] = useState(false);
+  const [showDrawOfferReceived, setShowDrawOfferReceived] = useState(false);
   const [resultData, setResultData] = useState<{
     result: "win" | "lose" | "draw";
     reason: string;
@@ -96,6 +107,7 @@ export default function GameScreen({
   const isOnlineMode = gameMode === "random" || gameMode === "friend";
 
   // Online sync effect
+  // biome-ignore lint/correctness/useExhaustiveDependencies: interval cleanup is handled manually
   useEffect(() => {
     if (!isOnlineMode || !gameStarted || !actor || !roomCode) return;
 
@@ -119,6 +131,19 @@ export default function GameScreen({
       }
     }, 10000);
 
+    // Check draw offer from opponent every 3 seconds
+    const drawPollInterval = setInterval(() => {
+      if (!roomCode) return;
+      const offerKey = `draw_offer_${roomCode}`;
+      const myOfferKey = `draw_offer_mine_${roomCode}`;
+      const opponentOffer = localStorage.getItem(offerKey);
+      const myOffer = localStorage.getItem(myOfferKey);
+      // If opponent made offer and I haven't responded yet
+      if (opponentOffer && opponentOffer !== session.code && !myOffer) {
+        setShowDrawOfferReceived(true);
+      }
+    }, 3000);
+
     // Check disconnect every 5 seconds
     disconnectIntervalRef.current = setInterval(async () => {
       try {
@@ -133,7 +158,10 @@ export default function GameScreen({
       }
     }, 5000);
 
-    return () => clearAllOnlineIntervals();
+    return () => {
+      clearAllOnlineIntervals();
+      clearInterval(drawPollInterval);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnlineMode, gameStarted, actor, roomCode, t.opponentDisconnected]);
 
@@ -145,6 +173,10 @@ export default function GameScreen({
       clearInterval(disconnectIntervalRef.current);
     if (countdownIntervalRef.current)
       clearInterval(countdownIntervalRef.current);
+    // Clean draw offer flags
+    if (roomCode) {
+      localStorage.removeItem(`draw_offer_mine_${roomCode}`);
+    }
     syncIntervalRef.current = null;
     heartbeatIntervalRef.current = null;
     disconnectIntervalRef.current = null;
@@ -264,6 +296,53 @@ export default function GameScreen({
     return "Başlangıç";
   };
 
+  const handleResign = () => {
+    setShowResignDialog(true);
+  };
+
+  const handleResignConfirm = async () => {
+    setShowResignDialog(false);
+    const elapsed = 0; // duration tracked by ChessBoard, use 0 as fallback
+    await handleMatchEnd("loss", -30, -20, elapsed);
+  };
+
+  const handleOfferDraw = async () => {
+    if (gameMode === "ai") {
+      // AI accepts 30% of the time
+      if (Math.random() < 0.3) {
+        toast.success(t.aiAcceptedDraw);
+        const elapsed = 0;
+        await handleMatchEnd("draw", 0, 0, elapsed);
+      } else {
+        toast.error(t.aiDeclinedDraw);
+      }
+    } else if (isOnlineMode && roomCode) {
+      // Store draw offer in localStorage keyed by roomCode
+      localStorage.setItem(`draw_offer_${roomCode}`, session.code);
+      localStorage.setItem(`draw_offer_mine_${roomCode}`, "true");
+      toast.info(t.drawOfferSent);
+      setDrawOfferPending(true);
+    }
+  };
+
+  const handleAcceptDraw = async () => {
+    setShowDrawOfferReceived(false);
+    const elapsed = 0;
+    await handleMatchEnd("draw", 0, 0, elapsed);
+    if (roomCode) {
+      localStorage.removeItem(`draw_offer_${roomCode}`);
+      localStorage.removeItem(`draw_offer_mine_${roomCode}`);
+    }
+  };
+
+  const handleDeclineDraw = () => {
+    setShowDrawOfferReceived(false);
+    if (roomCode) {
+      localStorage.removeItem(`draw_offer_${roomCode}`);
+    }
+    toast.info(t.drawOfferDeclined);
+  };
+
   // Feature 4: Match end handler - save to history and update user stats
   const handleMatchEnd = async (
     result: "win" | "loss" | "draw",
@@ -285,6 +364,19 @@ export default function GameScreen({
       // Also add weekly XP
       if (xpGained > 0) {
         await offlineStorage.addWeeklyXP(session.code, xpGained);
+      }
+      // Feature 3: Log jeton transfer for wins in online modes
+      if (result === "win" && isOnlineMode && jetonsGained > 0) {
+        await offlineStorage.logAdminAction({
+          type: "individual_jeton",
+          timestamp: Date.now(),
+          data: {
+            from: "opponent",
+            to: session.code,
+            amount: jetonsGained,
+            reason: "game_win",
+          },
+        });
       }
       // Update user XP, jetons, and title
       const currentUser = await offlineStorage.getUserByCode(session.code);
@@ -878,6 +970,30 @@ export default function GameScreen({
           )}
 
           {gameStarted && (
+            <div className="flex gap-2 mb-3 flex-wrap justify-center sm:justify-start">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleResign}
+                data-ocid="game.resign_button"
+                className="border-2 border-red-500/50 text-red-400 hover:bg-red-500/20 font-bold"
+              >
+                🏳️ {t.resign}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOfferDraw}
+                disabled={drawOfferPending}
+                data-ocid="game.draw_button"
+                className="border-2 border-amber-500/50 text-amber-400 hover:bg-amber-500/20 font-bold disabled:opacity-50"
+              >
+                🤝 {drawOfferPending ? t.drawOfferSent : t.offerDraw}
+              </Button>
+            </div>
+          )}
+
+          {gameStarted && (
             <ChessBoard
               gameMode={gameMode}
               roomCode={roomCode}
@@ -890,6 +1006,78 @@ export default function GameScreen({
           )}
         </div>
       </main>
+
+      {/* Resign Confirmation Dialog */}
+      <Dialog open={showResignDialog} onOpenChange={setShowResignDialog}>
+        <DialogContent
+          data-ocid="resign.dialog"
+          className="max-w-sm border-4 border-red-500/50 solid-overlay"
+        >
+          <DialogHeader>
+            <DialogTitle className="text-red-400 flex items-center gap-2 text-xl font-bold">
+              🏳️ {t.resignConfirmTitle}
+            </DialogTitle>
+            <DialogDescription className="text-base font-semibold pt-2">
+              {t.resignConfirm}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowResignDialog(false)}
+              data-ocid="resign.cancel_button"
+              className="font-bold"
+            >
+              İptal
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleResignConfirm}
+              data-ocid="resign.confirm_button"
+              className="font-bold"
+            >
+              🏳️ {t.resign}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Draw Offer Received Dialog (online) */}
+      <Dialog
+        open={showDrawOfferReceived}
+        onOpenChange={setShowDrawOfferReceived}
+      >
+        <DialogContent
+          data-ocid="draw_offer.dialog"
+          className="max-w-sm border-4 border-amber-500/50 solid-overlay"
+        >
+          <DialogHeader>
+            <DialogTitle className="text-amber-400 flex items-center gap-2 text-xl font-bold">
+              🤝 {t.drawOfferReceived}
+            </DialogTitle>
+            <DialogDescription className="text-base font-semibold pt-2">
+              {t.drawOfferReceived}?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={handleDeclineDraw}
+              data-ocid="draw_offer.cancel_button"
+              className="font-bold"
+            >
+              {t.drawOfferDeclined}
+            </Button>
+            <Button
+              onClick={handleAcceptDraw}
+              data-ocid="draw_offer.confirm_button"
+              className="btn-gradient-primary text-white font-bold"
+            >
+              {t.drawOfferAccepted}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {resultData && (
         <GameResultPopup

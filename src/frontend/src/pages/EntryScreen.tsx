@@ -140,6 +140,16 @@ export default function EntryScreen({
       const username = await offlineStorage.loginUser(loginCode.trim());
       const isAdmin = loginCode.trim() === "KING +154";
 
+      // Check ban status before allowing login
+      if (!isAdmin) {
+        const banned = await offlineStorage.isUserBanned(loginCode.trim());
+        if (banned) {
+          setLoginError(t.accountBanned);
+          setIsLoggingIn(false);
+          return;
+        }
+      }
+
       onLogin({
         username,
         code: loginCode.trim(),

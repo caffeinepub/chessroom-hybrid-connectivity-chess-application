@@ -22,6 +22,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -43,6 +45,7 @@ import {
   Crown,
   History,
   LogOut,
+  Pencil,
   ShoppingBag,
   Sparkles,
   Trash2,
@@ -116,6 +119,13 @@ export default function MainScreen({
   const [nextDailyClaim, setNextDailyClaim] = useState<Date | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showChangeUsernameDialog, setShowChangeUsernameDialog] =
+    useState(false);
+  const [newUsername, setNewUsername] = useState("");
+  const [isChangingUsername, setIsChangingUsername] = useState(false);
+  const [usernameChangeError, setUsernameChangeError] = useState<string | null>(
+    null,
+  );
   const [nextLeaderboardReset, setNextLeaderboardReset] = useState<Date | null>(
     null,
   );
@@ -229,6 +239,44 @@ export default function MainScreen({
       // silently ignore
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleChangeUsername = async () => {
+    if (!newUsername.trim()) return;
+    setUsernameChangeError(null);
+    setIsChangingUsername(true);
+    try {
+      // Check balance
+      const currentUser = await offlineStorage.getUserByCode(session.code);
+      if (!currentUser) throw new Error("User not found");
+      if (currentUser.jetons < 100) {
+        setUsernameChangeError(t.insufficientJetons);
+        return;
+      }
+      // Check if taken
+      const existing = await offlineStorage.getUserByUsername(
+        newUsername.trim(),
+      );
+      if (existing && existing.code !== session.code) {
+        setUsernameChangeError(t.usernameTaken);
+        return;
+      }
+      // Update username and deduct 100 jetons
+      const updatedJetons = currentUser.jetons - 100;
+      await offlineStorage.updateUser(session.code, {
+        username: newUsername.trim(),
+        jetons: updatedJetons,
+      });
+      offlineStorage.cacheUserJetons(session.code, updatedJetons);
+      toast.success(t.usernameChanged);
+      setShowChangeUsernameDialog(false);
+      setNewUsername("");
+      await refetchUser();
+    } catch (error: any) {
+      setUsernameChangeError(error.message || t.unknownError);
+    } finally {
+      setIsChangingUsername(false);
     }
   };
 
@@ -383,6 +431,15 @@ export default function MainScreen({
                   >
                     <History className="w-4 h-4 mr-2 text-purple-400" />
                     {t.matchHistory}
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem
+                    onClick={() => setShowChangeUsernameDialog(true)}
+                    data-ocid="profile.change_username_button"
+                    className="cursor-pointer m-2 p-3 border-2 border-blue-500/50 hover:bg-blue-500/20 hover:border-blue-500 text-foreground transition-all duration-300 font-bold rounded-md"
+                  >
+                    <Pencil className="w-4 h-4 mr-2 text-blue-400" />
+                    {t.changeUsername}
                   </DropdownMenuItem>
 
                   <DropdownMenuItem
@@ -789,6 +846,94 @@ export default function MainScreen({
         userCode={session.code}
         language={language}
       />
+
+      {/* Change Username Dialog */}
+      <Dialog
+        open={showChangeUsernameDialog}
+        onOpenChange={(open) => {
+          setShowChangeUsernameDialog(open);
+          if (!open) {
+            setNewUsername("");
+            setUsernameChangeError(null);
+          }
+        }}
+      >
+        <DialogContent
+          data-ocid="change_username.dialog"
+          className="max-w-sm border-4 border-blue-500/50 solid-overlay"
+        >
+          <DialogHeader>
+            <DialogTitle className="text-blue-400 flex items-center gap-2 text-xl font-bold">
+              <Pencil className="w-5 h-5" />
+              {t.changeUsernameTitle}
+            </DialogTitle>
+            <DialogDescription className="space-y-1 pt-2">
+              <span className="block font-semibold">
+                {t.changeUsernameDesc}
+              </span>
+              <span className="block text-amber-400 font-bold">
+                {t.usernameChangeCost}
+              </span>
+              <span className="block text-sm">
+                {t.currentBalance}: {userStats.jetons} {t.jetons}
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label htmlFor="new-username" className="font-bold">
+                {t.newUsername}
+              </Label>
+              <Input
+                id="new-username"
+                placeholder={t.newUsernamePlaceholder}
+                value={newUsername}
+                onChange={(e) => {
+                  setNewUsername(e.target.value);
+                  setUsernameChangeError(null);
+                }}
+                data-ocid="change_username.input"
+                className="border-2 h-11 font-semibold"
+              />
+              {usernameChangeError && (
+                <p
+                  data-ocid="change_username.error_state"
+                  className="text-sm text-destructive font-semibold"
+                >
+                  {usernameChangeError}
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowChangeUsernameDialog(false)}
+              data-ocid="change_username.cancel_button"
+              className="font-bold"
+            >
+              İptal
+            </Button>
+            <Button
+              onClick={handleChangeUsername}
+              disabled={isChangingUsername || !newUsername.trim()}
+              data-ocid="change_username.submit_button"
+              className="btn-gradient-primary text-white font-bold"
+            >
+              {isChangingUsername ? (
+                <>
+                  <Pencil className="w-4 h-4 mr-2 animate-spin" /> ...
+                </>
+              ) : (
+                <>
+                  <Pencil className="w-4 h-4 mr-2" />
+                  {t.changeUsername}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Account Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
