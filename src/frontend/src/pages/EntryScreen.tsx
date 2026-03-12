@@ -446,6 +446,24 @@ export default function EntryScreen({
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                {/* Registration Info Panel */}
+                <div className="mb-5 p-4 rounded-xl border-2 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 space-y-2">
+                  <p className="text-sm font-bold text-blue-700 dark:text-blue-300 flex items-center gap-2">
+                    <span>ℹ️</span> {t.registrationInfoTitle}
+                  </p>
+                  <p className="text-sm text-foreground/80">
+                    {t.registrationInfoStep1}
+                  </p>
+                  <p className="text-sm text-foreground/80">
+                    {t.registrationInfoStep2}
+                  </p>
+                  <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+                    {t.registrationInfoStep3}
+                  </p>
+                  <p className="text-sm text-green-700 dark:text-green-400">
+                    {t.registrationInfoPrivacy}
+                  </p>
+                </div>
                 <form onSubmit={handleRegister} className="space-y-5">
                   {registerError && (
                     <Alert variant="destructive" className="border-2">

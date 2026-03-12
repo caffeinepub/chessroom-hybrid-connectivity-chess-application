@@ -247,6 +247,12 @@ export interface Translations {
   insufficientJetonsShop: string;
   purchaseSuccess: string;
   codeLostMessage: string;
+  // Registration Info
+  registrationInfoTitle: string;
+  registrationInfoStep1: string;
+  registrationInfoStep2: string;
+  registrationInfoStep3: string;
+  registrationInfoPrivacy: string;
   // Game Result
   gameResult: string;
   youWon: string;
@@ -503,6 +509,15 @@ const translations: Record<Language, Translations> = {
     insufficientJetonsShop: "Yetersiz jeton bakiyesi",
     purchaseSuccess: "Satın alındı! 🎉",
     codeLostMessage: "Kodunu kaybettiysen yeni bir hesap oluşturabilirsin.",
+    registrationInfoTitle: "Kayıt Nasıl Çalışır?",
+    registrationInfoStep1:
+      "1. Kullanıcı adı seç: Sana özgün bir kullanıcı adı belirle.",
+    registrationInfoStep2:
+      "2. Kod al: Sisteme kayıt olunca sana özel 8 haneli bir giriş kodu oluşturulur.",
+    registrationInfoStep3:
+      "⚠️ Kodu kaydet: Bu kodu güvenli bir yere not et. Kodunu kaybedersen hesabına bir daha erişemezsin.",
+    registrationInfoPrivacy:
+      "🔒 Gizlilik: Kişisel veri toplanmaz. İsim, e-posta veya telefon bilgisi istenmez.",
     gameResult: "Oyun Sonucu",
     youWon: "Kazandın!",
     youLost: "Kaybettin",
@@ -757,6 +772,15 @@ const translations: Record<Language, Translations> = {
     insufficientJetonsShop: "Insufficient jetons",
     purchaseSuccess: "Purchased! 🎉",
     codeLostMessage: "If you lost your code, you can create a new account.",
+    registrationInfoTitle: "How Does Registration Work?",
+    registrationInfoStep1:
+      "1. Choose a username: Pick a unique username for yourself.",
+    registrationInfoStep2:
+      "2. Get your code: Once registered, you will receive a unique 8-character login code.",
+    registrationInfoStep3:
+      "⚠️ Save your code: Write it down somewhere safe. If you lose it, you cannot access your account.",
+    registrationInfoPrivacy:
+      "🔒 Privacy: No personal data is collected. No name, email, or phone number required.",
     gameResult: "Game Result",
     youWon: "You Won!",
     youLost: "You Lost",
@@ -990,6 +1014,14 @@ const translations: Record<Language, Translations> = {
     insufficientJetonsShop: "代币不足",
     purchaseSuccess: "购买成功！🎉",
     codeLostMessage: "如果您丢失了登录码，可以创建新账户。",
+    registrationInfoTitle: "注册如何进行？",
+    registrationInfoStep1: "1. 选择用户名：为自己选择一个独特的用户名。",
+    registrationInfoStep2:
+      "2. 获取代码：注册后，您将收到一个独特的8字符登录代码。",
+    registrationInfoStep3:
+      "⚠️ 保存您的代码：将其写在安全的地方。如果丢失，将无法访问您的账户。",
+    registrationInfoPrivacy:
+      "🔒 隐私：不收集个人数据。无需姓名、电子邮件或电话号码。",
     gameResult: "游戏结果",
     youWon: "你赢了！",
     youLost: "你输了",
@@ -1230,6 +1262,15 @@ const translations: Record<Language, Translations> = {
     insufficientJetonsShop: "Fichas insuficientes",
     purchaseSuccess: "¡Comprado! 🎉",
     codeLostMessage: "Si perdiste tu código, puedes crear una nueva cuenta.",
+    registrationInfoTitle: "¿Cómo Funciona el Registro?",
+    registrationInfoStep1:
+      "1. Elige un nombre de usuario: Escoge un nombre único para ti.",
+    registrationInfoStep2:
+      "2. Obtén tu código: Al registrarte, recibirás un código de inicio de sesión de 8 caracteres.",
+    registrationInfoStep3:
+      "⚠️ Guarda tu código: Escríbelo en un lugar seguro. Si lo pierdes, no podrás acceder a tu cuenta.",
+    registrationInfoPrivacy:
+      "🔒 Privacidad: No se recopilan datos personales. No se requiere nombre, correo ni teléfono.",
     gameResult: "Resultado del Juego",
     youWon: "¡Ganaste!",
     youLost: "Perdiste",
@@ -1463,6 +1504,14 @@ const translations: Record<Language, Translations> = {
     insufficientJetonsShop: "पर्याप्त जेटन नहीं",
     purchaseSuccess: "खरीदा गया! 🎉",
     codeLostMessage: "यदि आपने अपना कोड खो दिया है, तो एक नया खाता बना सकते हैं।",
+    registrationInfoTitle: "पंजीकरण कैसे काम करता है?",
+    registrationInfoStep1: "1. उपयोगकर्ता नाम चुनें: अपने लिए एक अनूठा नाम चुनें।",
+    registrationInfoStep2:
+      "2. कोड प्राप्त करें: पंजीकरण के बाद आपको 8 अक्षरों का विशेष लॉगिन कोड मिलेगा।",
+    registrationInfoStep3:
+      "⚠️ कोड सुरक्षित रखें: इसे किसी सुरक्षित जगह लिख लें। यदि खो गया तो खाते तक पहुँच नहीं होगी।",
+    registrationInfoPrivacy:
+      "🔒 गोपनीयता: कोई व्यक्तिगत डेटा एकत्र नहीं किया जाता। नाम, ईमेल या फोन नहीं चाहिए।",
     gameResult: "खेल परिणाम",
     youWon: "आप जीते!",
     youLost: "आप हारे",
@@ -1696,6 +1745,14 @@ const translations: Record<Language, Translations> = {
     insufficientJetonsShop: "رصيد الرموز غير كافٍ",
     purchaseSuccess: "تم الشراء! 🎉",
     codeLostMessage: "إذا فقدت رمزك، يمكنك إنشاء حساب جديد.",
+    registrationInfoTitle: "كيف يعمل التسجيل؟",
+    registrationInfoStep1: "1. اختر اسم مستخدم: اختر اسمًا فريدًا لنفسك.",
+    registrationInfoStep2:
+      "2. احصل على رمزك: بعد التسجيل، ستتلقى رمز تسجيل دخول مؤلفًا من 8 أحرف.",
+    registrationInfoStep3:
+      "⚠️ احفظ رمزك: اكتبه في مكان آمن. إذا فقدته، لن تتمكن من الوصول إلى حسابك.",
+    registrationInfoPrivacy:
+      "🔒 الخصوصية: لا يتم جمع بيانات شخصية. لا حاجة لاسم أو بريد إلكتروني أو هاتف.",
     gameResult: "نتيجة اللعبة",
     youWon: "لقد فزت!",
     youLost: "لقد خسرت",
@@ -1938,6 +1995,15 @@ const translations: Record<Language, Translations> = {
     insufficientJetonsShop: "Fichas insuficientes",
     purchaseSuccess: "Comprado! 🎉",
     codeLostMessage: "Se perdeu seu código, você pode criar uma nova conta.",
+    registrationInfoTitle: "Como Funciona o Cadastro?",
+    registrationInfoStep1:
+      "1. Escolha um nome de usuário: Escolha um nome único para você.",
+    registrationInfoStep2:
+      "2. Receba seu código: Após o cadastro, você receberá um código de login de 8 caracteres.",
+    registrationInfoStep3:
+      "⚠️ Salve seu código: Anote em um lugar seguro. Se perdê-lo, não poderá acessar sua conta.",
+    registrationInfoPrivacy:
+      "🔒 Privacidade: Nenhum dado pessoal é coletado. Não é necessário nome, e-mail ou telefone.",
     gameResult: "Resultado do Jogo",
     youWon: "Você Ganhou!",
     youLost: "Você Perdeu",
@@ -2184,6 +2250,15 @@ const translations: Record<Language, Translations> = {
     purchaseSuccess: "Acheté! 🎉",
     codeLostMessage:
       "Si vous avez perdu votre code, vous pouvez créer un nouveau compte.",
+    registrationInfoTitle: "Comment Fonctionne l'Inscription?",
+    registrationInfoStep1:
+      "1. Choisissez un nom d'utilisateur: Choisissez un nom unique pour vous.",
+    registrationInfoStep2:
+      "2. Obtenez votre code: Après l'inscription, vous recevrez un code de connexion de 8 caractères.",
+    registrationInfoStep3:
+      "⚠️ Sauvegardez votre code: Notez-le dans un endroit sûr. Si vous le perdez, vous ne pourrez plus accéder à votre compte.",
+    registrationInfoPrivacy:
+      "🔒 Confidentialité: Aucune donnée personnelle n'est collectée. Pas besoin de nom, e-mail ou téléphone.",
     gameResult: "Résultat de la Partie",
     youWon: "Vous avez Gagné!",
     youLost: "Vous avez Perdu",
@@ -2425,6 +2500,15 @@ const translations: Record<Language, Translations> = {
     insufficientJetonsShop: "Недостаточно жетонов",
     purchaseSuccess: "Куплено! 🎉",
     codeLostMessage: "Если вы потеряли код, вы можете создать новый аккаунт.",
+    registrationInfoTitle: "Как работает регистрация?",
+    registrationInfoStep1:
+      "1. Выберите имя пользователя: Придумайте уникальное имя для себя.",
+    registrationInfoStep2:
+      "2. Получите код: После регистрации вы получите уникальный 8-символьный код входа.",
+    registrationInfoStep3:
+      "⚠️ Сохраните код: Запишите его в безопасном месте. Если потеряете, доступ к аккаунту будет утерян.",
+    registrationInfoPrivacy:
+      "🔒 Конфиденциальность: Личные данные не собираются. Имя, email или телефон не нужны.",
     gameResult: "Результат Игры",
     youWon: "Вы Победили!",
     youLost: "Вы Проиграли",
@@ -2663,6 +2747,15 @@ const translations: Record<Language, Translations> = {
     insufficientJetonsShop: "トークンが不足しています",
     purchaseSuccess: "購入しました！🎉",
     codeLostMessage: "コードを紛失した場合は、新しいアカウントを作成できます。",
+    registrationInfoTitle: "登録の仕組みは？",
+    registrationInfoStep1:
+      "1. ユーザー名を選ぶ: 自分だけのユニークな名前を選んでください。",
+    registrationInfoStep2:
+      "2. コードを受け取る: 登録後、8文字のログインコードが発行されます。",
+    registrationInfoStep3:
+      "⚠️ コードを保存: 安全な場所にメモしてください。紛失するとアカウントにアクセスできなくなります。",
+    registrationInfoPrivacy:
+      "🔒 プライバシー: 個人データは収集されません。名前・メール・電話番号は不要です。",
     gameResult: "ゲーム結果",
     youWon: "あなたの勝利！",
     youLost: "あなたの負け",
@@ -2915,6 +3008,15 @@ const translations: Record<Language, Translations> = {
     purchaseSuccess: "Gekauft! 🎉",
     codeLostMessage:
       "Wenn Sie Ihren Code verloren haben, können Sie ein neues Konto erstellen.",
+    registrationInfoTitle: "Wie funktioniert die Registrierung?",
+    registrationInfoStep1:
+      "1. Benutzername wählen: Wählen Sie einen einzigartigen Namen für sich.",
+    registrationInfoStep2:
+      "2. Code erhalten: Nach der Registrierung erhalten Sie einen 8-stelligen Anmeldecode.",
+    registrationInfoStep3:
+      "⚠️ Code speichern: Notieren Sie ihn an einem sicheren Ort. Wenn Sie ihn verlieren, können Sie nicht mehr auf Ihr Konto zugreifen.",
+    registrationInfoPrivacy:
+      "🔒 Datenschutz: Es werden keine persönlichen Daten gesammelt. Kein Name, E-Mail oder Telefon erforderlich.",
     gameResult: "Spielergebnis",
     youWon: "Sie haben gewonnen!",
     youLost: "Sie haben verloren",
